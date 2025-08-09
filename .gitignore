@@ -1,0 +1,30 @@
+# Local env
+.env
+
+# Go
+/bin/
+*.test
+*.out
+coverage*
+
+# Air
+/tmp/
+services/*/tmp/
+*.air.log
+
+# Docker / compose
+compose.override.local.yaml
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Scratch
+/scratch/
+
+# Web build and browser test artifacts
+**/node_modules/
+**/dist/
+**/playwright-report/
+**/test-results/

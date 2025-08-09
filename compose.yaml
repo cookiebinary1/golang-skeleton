@@ -1,0 +1,95 @@
+name: golang-skeleton
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  nats:
+    image: nats:2.11-alpine
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    volumes:
+      - natsdata:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      target: release
+    image: golang-skeleton/api:local
+    init: true
+    stop_grace_period: 15s
+    environment:
+      SERVICE_NAME: api
+      ENV: ${ENV:-dev}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      HTTP_ADDR: 0.0.0.0:8080
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      NATS_URL: nats://nats:4222
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+      target: release
+    image: golang-skeleton/worker:local
+    init: true
+    stop_grace_period: 15s
+    environment:
+      SERVICE_NAME: worker
+      ENV: ${ENV:-dev}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      HTTP_ADDR: 0.0.0.0:8081
+      NATS_URL: nats://nats:4222
+    ports:
+      - "127.0.0.1:${WORKER_PORT:-8081}:8081"
+    depends_on:
+      nats:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: services/web/Dockerfile
+      target: release
+    image: golang-skeleton/web:local
+    init: true
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:8080"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  pgdata:
+  natsdata:

@@ -1,0 +1,81 @@
+# Publish only revisions that passed CI. Cluster deployment is opt-in.
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: cd-main
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  build-push:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [api, worker, web]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/${{ matrix.service }}/Dockerfile
+          target: release
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/${{ matrix.service }}:sha-${{ github.event.workflow_run.head_sha }}
+            ghcr.io/${{ github.repository }}/${{ matrix.service }}:latest
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+  deploy:
+    needs: build-push
+    if: vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: azure/setup-kubectl@v4
+      - uses: imranismail/setup-kustomize@v2
+      - name: Deploy tested revision
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+          SHA: sha-${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          trap 'rm -f "$KUBECONFIG"' EXIT
+          printf '%s' "$KUBE_CONFIG" | base64 --decode > "$KUBECONFIG"
+          cd deploy/k8s/overlays/prod
+          kustomize edit set image \
+            "ghcr.io/cookiebinary1/golang-skeleton/api=${REGISTRY}/${IMAGE_PREFIX}/api:${SHA}" \
+            "ghcr.io/cookiebinary1/golang-skeleton/worker=${REGISTRY}/${IMAGE_PREFIX}/worker:${SHA}" \
+            "ghcr.io/cookiebinary1/golang-skeleton/web=${REGISTRY}/${IMAGE_PREFIX}/web:${SHA}"
+          kubectl apply -k .
+          kubectl -n golang-skeleton rollout status deployment/api --timeout=180s
+          kubectl -n golang-skeleton rollout status deployment/worker --timeout=180s
+          kubectl -n golang-skeleton rollout status deployment/web --timeout=180s

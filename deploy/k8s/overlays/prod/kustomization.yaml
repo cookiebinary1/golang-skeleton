@@ -1,0 +1,16 @@
+# Create postgres-credentials externally before applying this overlay.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: golang-skeleton
+
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/cookiebinary1/golang-skeleton/api
+    newTag: latest
+  - name: ghcr.io/cookiebinary1/golang-skeleton/worker
+    newTag: latest
+  - name: ghcr.io/cookiebinary1/golang-skeleton/web
+    newTag: latest

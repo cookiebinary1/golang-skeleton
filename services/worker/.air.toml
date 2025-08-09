@@ -1,0 +1,22 @@
+# Run from the repository root so shared packages and module files are watched.
+root = "."
+tmp_dir = "services/worker/tmp"
+
+[build]
+cmd = "go build -o ./services/worker/tmp/main ./services/worker/cmd"
+bin = "./services/worker/tmp/main"
+include_dir = ["pkg", "services/worker"]
+include_file = ["go.mod", "go.sum"]
+include_ext = ["go", "sql"]
+exclude_dir = ["services/worker/tmp", ".git", "scratch"]
+exclude_regex = ["_test\\.go"]
+delay = 300
+stop_on_error = true
+send_interrupt = true
+kill_delay = 2000
+
+[log]
+time = true
+
+[misc]
+clean_on_exit = true

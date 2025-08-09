@@ -1,0 +1,21 @@
+# Build context is the repo root; keep it small.
+.git
+.github
+.env
+.env.example
+deploy
+docs
+scripts
+scratch
+**/*_test.go
+**/tmp
+*.md
+LICENSE
+Makefile
+docker-bake.hcl
+
+# Web build and browser test artifacts
+**/node_modules/
+**/dist/
+**/playwright-report/
+**/test-results/

@@ -1,0 +1,34 @@
+# Dev overlay: single replicas, dev image tag, debug logging.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: golang-skeleton-dev
+
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/cookiebinary1/golang-skeleton/api
+    newTag: latest
+  - name: ghcr.io/cookiebinary1/golang-skeleton/worker
+    newTag: latest
+  - name: ghcr.io/cookiebinary1/golang-skeleton/web
+    newTag: latest
+
+patches:
+  # multi-document strategic merge patch (one doc per deployment)
+  - path: patch-replicas.yaml
+  - path: patch-debug-logging.yaml
+    target:
+      kind: Deployment
+      name: api
+
+# Demo credentials exist only in the development overlay.
+secretGenerator:
+  - name: postgres-credentials
+    literals:
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+      - POSTGRES_DB=app
+    options:
+      disableNameSuffixHash: true

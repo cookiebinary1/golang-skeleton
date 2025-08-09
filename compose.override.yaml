@@ -1,0 +1,62 @@
+# Dev overlay - automatically merged with compose.yaml by `docker compose up`.
+# Hot reload via Air inside containers; source is bind-mounted from the host.
+# Postgres/NATS ports are exposed for running services locally with `make dev-api`.
+
+services:
+  postgres:
+    ports:
+      # Override POSTGRES_HOST_PORT in .env when a local Postgres already
+      # occupies 5432 (e.g. Homebrew service).
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+
+  nats:
+    ports:
+      - "127.0.0.1:${NATS_HOST_PORT:-4222}:4222"
+      - "127.0.0.1:${NATS_HTTP_PORT:-8222}:8222"
+
+  api:
+    build:
+      target: dev
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+    volumes:
+      - ./go.mod:/src/go.mod:ro
+      - ./go.sum:/src/go.sum:ro
+      - ./pkg:/src/pkg
+      - ./services/api:/src/services/api
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    command: ["air", "-c", "services/api/.air.toml"]
+
+  worker:
+    build:
+      target: dev
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+    volumes:
+      - ./go.mod:/src/go.mod:ro
+      - ./go.sum:/src/go.sum:ro
+      - ./pkg:/src/pkg
+      - ./services/worker:/src/services/worker
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    command: ["air", "-c", "services/worker/.air.toml"]
+
+  web:
+    build:
+      target: dev
+    environment:
+      API_PROXY_TARGET: http://api:8080
+    # Keep the same published container port in both dev and release.
+    command: ["npm", "run", "dev", "--", "--port", "8080"]
+    volumes:
+      - ./services/web/src:/app/src
+      - ./services/web/index.html:/app/index.html:ro
+      - ./services/web/vite.config.ts:/app/vite.config.ts:ro
+      - ./services/web/tsconfig.json:/app/tsconfig.json:ro
+
+volumes:
+  go-mod-cache:
+  go-build-cache:

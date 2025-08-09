@@ -1,0 +1,21 @@
+# Prod-like overlay for the full stack on a single host (or CI e2e environment).
+# Usage: docker compose -f compose.yaml -f compose.prod.yaml up -d
+# NOTE: compose.override.yaml (dev) is intentionally NOT loaded here.
+
+services:
+  api:
+    restart: unless-stopped
+    environment:
+      ENV: prod
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+
+  worker:
+    restart: unless-stopped
+    environment:
+      ENV: prod
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+
+  web:
+    restart: unless-stopped

@@ -1,0 +1,26 @@
+import { test, expect } from '@playwright/test'
+
+test('creates and retrieves a real person through the web proxy', async ({ page }) => {
+  const email = `browser-${Date.now()}@example.com`
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Your people.' })).toBeVisible()
+  await expect(page.getByText('Loading your team…')).not.toBeVisible()
+  await page.getByLabel('Full name').fill('Browser Test')
+  await page.getByLabel('Email address').fill(email)
+  await page.getByRole('button', { name: 'Add to team' }).click()
+  await expect(page.getByRole('status')).toHaveText('Browser Test was added to your team.')
+  await page.getByLabel('Search people').fill(email)
+  await expect(page.getByRole('row').filter({ hasText: email })).toBeVisible()
+  await page.getByRole('button', { name: 'View Browser Test' }).click()
+  await expect(page.getByRole('link', { name: email })).toBeVisible()
+  await page.screenshot({ path: 'test-results/people-desktop.png', fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByRole('heading', { name: 'Add a teammate' })).toBeVisible()
+  await page.screenshot({ path: 'test-results/people-mobile.png', fullPage: true })
+  await page.reload()
+  await expect(page.getByRole('row').filter({ hasText: email })).toBeVisible()
+  await page.getByLabel('Full name').fill('Duplicate')
+  await page.getByLabel('Email address').fill(email)
+  await page.getByRole('button', { name: 'Add to team' }).click()
+  await expect(page.getByRole('alert')).toHaveText('This email is already in your team.')
+})
